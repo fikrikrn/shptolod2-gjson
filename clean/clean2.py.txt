@@ -1,0 +1,48 @@
+import geopandas as gpd
+import numpy as np
+from tqdm import tqdm
+
+INPUT = 'data/tiff_3-ref-reg.geojson'
+OUTPUT = 'out/tiff_3-ref-reg-clean.geojson'
+
+
+# read file
+gdf = gpd.read_file(INPUT)
+
+# Reset the index to add a default numeric index
+gdf.reset_index(drop=False, inplace=True)
+
+# Rename the index column to 'id'
+gdf.rename(columns={'index': 'uid'}, inplace=True)
+
+# Make a deep copy of the original GeoDataFrame
+new_gdf = gdf.copy()
+
+# Initialize progress bar
+pbar = tqdm(total=len(gdf))
+
+# Iterate through each row
+for index, row in gdf.iterrows():
+    # Apply 'difference' function with all other rows
+    for other_index, other_row in gdf.iterrows():
+        if index != other_index:  # Avoid comparing a row with itself
+            row['geometry'] = row['geometry'].difference(other_row['geometry'])
+    
+    # Replace the original row with the result
+    new_gdf.at[index, 'geometry'] = row['geometry']
+    
+    # Update progress bar
+    pbar.update(1)
+
+# Close progress bar
+pbar.close()
+
+# Assign the updated GeoDataFrame back to the original one
+gdf = new_gdf
+print(gdf.head())
+
+# export
+gdf.to_file(
+    OUTPUT,
+    driver='GeoJSON'
+)

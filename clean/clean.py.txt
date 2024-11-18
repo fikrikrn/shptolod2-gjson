@@ -1,0 +1,240 @@
+# import geopandas as gpd
+# from tqdm import tqdm
+# from shapely.ops import unary_union
+# import numpy as np
+
+
+# def runnn(input:str, output:str, thres:float, iter:float):
+#     # Read GeoJSON file into GeoDataFrame with error handling
+#     THRESHOLD = thres
+#     ITER = iter
+
+#     for i in range(ITER):
+#         try:
+#             if i == 0:
+#                 building_gdf = gpd.read_file(input)
+#             else:
+#                 building_gdf = gpd.read_file(output)
+
+#             # Fix invalid geometries
+#             building_gdf['geometry'] = building_gdf['geometry'].buffer(0)
+
+#             # Create a spatial index for faster intersection checks
+#             building_gdf = building_gdf.dropna(subset=['geometry'])  # Drop rows with invalid geometries
+#             if not building_gdf.empty:
+#                 spatial_index = building_gdf.sindex
+#             else:
+#                 print("GeoDataFrame is empty after dropping rows with invalid geometries.")
+#                 continue  # Skip to the next iteration if GeoDataFrame is empty
+
+#         except ValueError as e:
+#             print(f"Error reading GeoJSON file: {e}")
+#             continue  # Skip to the next iteration if there's an error reading the GeoJSON file
+
+#         # List to store merged features
+#         merged_features = []
+
+#         # Set to keep track of processed features
+#         processed_features = set()
+
+#         # Iterate over each feature
+#         for i, geom_a in tqdm(building_gdf.iterrows(), total=len(building_gdf), desc="Processing features"):
+#             # Skip if the feature has already been processed
+#             if i in processed_features:
+#                 continue
+            
+#             try:
+#                 # Get potential intersecting features using spatial index
+#                 if spatial_index:
+#                     possible_matches_index = list(spatial_index.intersection(geom_a['geometry'].bounds))
+#                 else:
+#                     possible_matches_index = []
+
+#                 # List to store geometries of intersecting features
+#                 intersecting_geometries = []
+                
+#                 # Check intersection with other features
+#                 for j in possible_matches_index:
+#                     if i != j:
+#                         geom_b = building_gdf.loc[j, 'geometry']
+
+#                         # Check if the features intersect
+#                         if geom_a['geometry'].intersects(geom_b):
+#                             # Calculate the intersection area relative to each feature's area
+#                             intersection_area_a = geom_a['geometry'].intersection(geom_b).area / geom_a['geometry'].area
+#                             intersection_area_b = geom_a['geometry'].intersection(geom_b).area / geom_b.area
+
+#                             # Check if either feature has an intersection area greater than threshold value
+#                             if intersection_area_a > THRESHOLD or intersection_area_b > THRESHOLD:
+#                                 intersecting_geometries.append(geom_b)
+#                                 processed_features.add(j)  # Mark as processed
+
+                
+#                 # Merge intersecting features
+#                 if intersecting_geometries:
+#                     # Apply the difference function to the intersecting geometries
+#                     for intersecting_geometry in intersecting_geometries:
+#                         geom_a['geometry'] = geom_a['geometry'].difference(intersecting_geometry)
+                    
+#                     # Store the updated geometry
+#                     merged_features.append({'id': f"{i}_merged", 'geometry': geom_a['geometry']})
+#                     # for idx, intersecting_geometry in enumerate(intersecting_geometries):
+#                     #     merged_features.append({'id': f"{i}_{idx}", 'geometry': intersecting_geometry})
+#                 else:
+#                     # If no intersection found, add the original feature
+#                     merged_features.append({'id': f"{i}_asli", 'geometry': geom_a['geometry']})
+
+            
+#             except KeyError as e:
+#                 print(f"KeyError occurred for index {i}: {e}")
+#                 continue  # Skip to the next iteration if there's a KeyError
+
+#         for idx in processed_features:
+#             geom = building_gdf.loc[idx, 'geometry']
+#             merged_features.append({'id': f"{idx}_0", 'geometry': geom})
+            
+#         # Create a GeoDataFrame with the merged features
+#         merged_features_gdf = gpd.GeoDataFrame(merged_features, crs=building_gdf.crs)
+
+#         # Save the updated GeoDataFrame to a new GeoJSON file
+#         merged_features_gdf.to_file(output, driver='GeoJSON')
+#         print(len(processed_features))
+
+# runnn(
+#     input='out/bogor1x1-reg.geojson',
+#     output='out/bogor1x1-reg-2.geojson',
+#     thres=0,
+#     iter=5
+# )
+
+
+import geopandas as gpd
+from tqdm import tqdm
+from shapely.ops import unary_union
+from shapely.geometry import Point
+import numpy as np
+
+
+def runnn(input:str, output:str, thres:float, iter:float):
+    # Read GeoJSON file into GeoDataFrame with error handling
+    THRESHOLD = thres
+    ITER = iter
+
+    for i in range(ITER):
+        try:
+            if i == 0:
+                building_gdf = gpd.read_file(input)
+            else:
+                building_gdf = gpd.read_file(output)
+
+            # Fix invalid geometries
+            building_gdf['geometry'] = building_gdf['geometry'].buffer(0)
+
+            # print(building_gdf)
+
+            # Create a spatial index for faster intersection checks
+            building_gdf = building_gdf.dropna(subset=['geometry'])  # Drop rows with invalid geometries
+            # building_gdf['geometry'] = building_gdf['geometry'].apply(lambda geom: geom if geom.is_valid else np.nan)
+
+            if not building_gdf.empty:
+                spatial_index = building_gdf.sindex
+            else:
+                print("GeoDataFrame is empty after dropping rows with invalid geometries.")
+                continue  # Skip to the next iteration if GeoDataFrame is empty
+
+        except ValueError as e:
+            print(f"Error reading GeoJSON file: {e}")
+            # continue  # Skip to the next iteration if there's an error reading the GeoJSON file
+
+        # List to store merged features
+        merged_features = []
+
+        # Set to keep track of processed features
+        processed_features = set()
+
+        # print(building_gdf.isnull().sum())
+
+        idx_0 = []
+        idx_1 = []
+
+        # Iterate over each feature
+        for i, geom_a in tqdm(building_gdf.iterrows(), total=len(building_gdf), desc="Processing features"):
+            # Skip if the feature has already been processed
+            if i in processed_features:
+                continue
+            
+            try:
+
+                # Get potential intersecting features using spatial index
+                if spatial_index:
+                    possible_matches_index = list(spatial_index.intersection(geom_a['geometry'].bounds))
+                else:
+                    possible_matches_index = []
+
+                # List to store geometries of intersecting features
+                intersecting_geometries = []
+                # print(i)
+                # if i == 333:
+                #     print(building_gdf.iloc[337])
+
+                # Check intersection with other features
+                for j in possible_matches_index:
+                    if i != j:
+                        # print(f'i:{i}, j:{j}')
+                        # geom_b = building_gdf.iloc[j, 'geometry']
+                        geom_b = building_gdf.loc[j,'geometry']
+
+                        # Check if the features intersect
+                        if geom_a['geometry'].intersects(geom_b):
+                            # Calculate the intersection area relative to each feature's area
+                            intersection_area_a = geom_a['geometry'].intersection(geom_b).area / geom_a['geometry'].area
+                            intersection_area_b = geom_a['geometry'].intersection(geom_b).area / geom_b.area
+
+                            # Check if either feature has an intersection area greater than threshold value
+                            if intersection_area_a > THRESHOLD or intersection_area_b > THRESHOLD:
+                                intersecting_geometries.append(geom_b)
+                                processed_features.add(j)  # Mark as processed
+
+                
+                # Merge intersecting features
+                if intersecting_geometries:
+                    # Apply the difference function to the intersecting geometries
+                    for intersecting_geometry in intersecting_geometries:
+                        geom_a['geometry'] = geom_a['geometry'].difference(intersecting_geometry)
+                    
+                    # Store the updated geometry
+                    merged_features.append({'id': f"{i}_merged", 'geometry': geom_a['geometry']})
+                    for idx, intersecting_geometry in enumerate(intersecting_geometries):
+                        merged_features.append({'id': f"{i}_{idx}", 'geometry': intersecting_geometry})
+                else:
+                    # If no intersection found, add the original feature
+                    merged_features.append({'id': f"{i}_asli", 'geometry': geom_a['geometry']})
+
+                
+            except KeyError as e:
+                print(f"KeyError occurred for index {i}: {e}")
+                idx_0.append(i)
+                idx_1.append(e)
+                continue  # Skip to the next iteration if there's a KeyError
+                # print(e)
+
+        for idx in processed_features:
+            if idx in building_gdf.index:
+                geom = building_gdf.loc[idx, 'geometry']
+                merged_features.append({'id': f"{idx}_0", 'geometry': geom})
+            
+        # Create a GeoDataFrame with the merged features
+        merged_features_gdf = gpd.GeoDataFrame(merged_features, crs=building_gdf.crs)
+
+        # Save the updated GeoDataFrame to a new GeoJSON file
+        merged_features_gdf.to_file(output, driver='GeoJSON')
+        # print(len(processed_features))
+        # print(f'idx 0: {len(idx_0)}, idx 1: {len(idx_1)}')
+        # print(idx_0)
+
+runnn(
+    input='data/tiff_1-ref-reg.geojson',
+    output='out/tiff_1-ref-reg-cleaned.geojson',
+    thres=0,
+    iter=5
+)
